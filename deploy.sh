@@ -10,7 +10,7 @@ cp -r dist/* docs/
 echo "copy files"
 git add docs
 echo "📝 Committing changes..."
-git commit -m "commitment issues"
+git commit -m "added debug"
 git push
 
-echo "🎉 Done! Your site should be live shortly."
+echo "finish line"
