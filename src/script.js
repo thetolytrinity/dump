@@ -3,8 +3,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import GUI from 'lil-gui'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-
-
 // GRAPHICAL USER INTER FACE ANNOUNCEMENT
 
 const gui = new GUI ({
@@ -21,12 +19,10 @@ const debugObject =
         amplitude: 0,
         repulsionDistance: 0.5,
         repulsionForce: 2,
+        pixelDensity: 3
     }
     
-//hiding the gui with event listener, allowing for the debug menu
-// to be made visible/invisible when typing 'h' (sick guy)
-gui
-.hide ()
+gui.hide ()
 
 // Declaring event as 'keydown' function
 window.addEventListener ('keydown', (event) =>
@@ -38,10 +34,11 @@ window.addEventListener ('keydown', (event) =>
 //MODEL1
 let model = null
 
+let currentPixelDensity = debugObject.pixelDensity
+
 /**
  * Base
  */
-
 
 // Canvas
 const canvas = document.querySelector('canvas.webgl')
@@ -49,9 +46,7 @@ const canvas = document.querySelector('canvas.webgl')
 // Scene
 const scene = new THREE.Scene()
 
-
 // Object
-
 // Always GEOMETRY > MATERIAL > MESH
 
 const geometry = new THREE.BufferGeometry()
@@ -66,6 +61,7 @@ const geometry = new THREE.BufferGeometry()
 // Each 3 values = 1 vertex position in 3D space
 
 const count = debugObject.meshCount
+
 // Count * 3 positions for vertex * 3 *
 const positionsARRAY = new Float32Array(count * 3 * 3)
 
@@ -73,7 +69,6 @@ const positionsARRAY = new Float32Array(count * 3 * 3)
 for(let i = 0; i < count * 3 *3; i++)
 {
     positionsARRAY[i] = Math.random() - 0.5
-
 }
 
 const positionsAttribute = new THREE.BufferAttribute(positionsARRAY, 3)
@@ -94,7 +89,7 @@ scene.add(hardLight)
 
 
 
-//GEOMETRY REGENERATE
+//GEOMETRY REGENERATE for FLOAT 32 GEOMETRY
 //Im doing this because its imperative
 //everytime you make a change to geometry with debug too
 //it helps to delete the older geometry you are working to manipulate
@@ -115,9 +110,10 @@ geometry.computeBoundingSphere()
 // Update OrbitControls target to center of new geometry
 if (geometry.boundingSphere) {
     controls.target.copy(geometry.boundingSphere.center)
+}
+}
 
-}
-}
+// GUI SETTINGS
 
 const tumpz = gui.addFolder ('Model')
         // model 
@@ -127,8 +123,6 @@ const tumpz = gui.addFolder ('Model')
     .max(0.1)
     .step(0.001)
     .name('Anim Speed')
-
-    
 
 gui
 .addColor (debugObject, 'color')
@@ -147,9 +141,6 @@ gui
 regenerateGeometry()
 })
    
-    
-
-
 gui
 .add (debugObject, 'wireframe') .onChange(() =>
 {
@@ -178,14 +169,23 @@ gui
 gui
 .add (mesh, 'visible')
 
+const PS1 = gui.addFolder ('renderer')
+PS1.add (debugObject, 'pixelDensity' )
+.min(1)
+.max(8)
+.step(1)
+.name ('Pixelation')
+.onChange (() =>{
+    debugObject.pixelDensity = Math.floor(debugObject.pixelDensity)
+})
 
-
-// Sizes
+// VIEWPORT SIZE 
 const sizes = {
     width: window.innerWidth,
     height: window.innerHeight
 }
 
+// AUTO RESIZING FUNCTION
 window.addEventListener('resize', () =>
 {
     // Update sizes
@@ -197,8 +197,13 @@ window.addEventListener('resize', () =>
     camera.updateProjectionMatrix()
 
     // Update renderer
-    renderer.setSize(sizes.width, sizes.height)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+    //renderer.setSize(sizes.width, sizes.height)
+    //renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+    renderer.setSize(
+        sizes.width / debugObject.pixelDensity,
+        sizes.height / debugObject.pixelDensity,
+        false
+      )
 })
 
 // Camera
@@ -215,6 +220,7 @@ loader.load(`${import.meta.env.BASE_URL}models/Runaway.glb`, (gltf) =>
 {
 
     model = gltf.scene
+    
     model.scale.set (.3, .3, .3) //tweakable model scale x, y, z
     model.position.set(0, -1, 0)
     scene.add(model)
@@ -247,11 +253,17 @@ const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
 
 // Renderer
+// Renderer
 const renderer = new THREE.WebGLRenderer({
-    canvas: canvas
+    canvas: canvas,
+    antialias: false
 })
-renderer.setSize(sizes.width, sizes.height)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
+
+renderer.setSize(sizes.width / 2, sizes.height / 2, false) // HALF resolution
+renderer.domElement.style.imageRendering = 'pixelated'     
+renderer.domElement.style.width = '100%'
+renderer.domElement.style.height = '100%'
+renderer.setPixelRatio(1) // avoid HD smoothing
 
 // Animate
 
@@ -287,6 +299,7 @@ for (let i =0; i < positionAttr.count; i++) {
 }
 positionAttr.needsUpdate = true
 }
+
 const tick = () =>
 {
 
@@ -306,11 +319,20 @@ if (mixer) {
 }
 
 animationMouseReact(geometry.attributes.position, elapsedTime, mouse3D)
+
    
     // Update controls
     controls.update()
     
     // Render
+    if (debugObject.pixelDensity !== currentPixelDensity) {
+        currentPixelDensity = debugObject.pixelDensity
+        renderer.setSize(
+            sizes.width / currentPixelDensity,
+            sizes.height / currentPixelDensity,
+            false
+        )
+    }
     renderer.render(scene, camera)
 
     // Call tick again on the next frame
