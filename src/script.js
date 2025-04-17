@@ -1,10 +1,8 @@
-console.log ( 'test' )
-
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import gsap from 'gsap'
 import GUI from 'lil-gui'
-import { step, uint } from 'three/tsl'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
 
 
 // GRAPHICAL USER INTER FACE ANNOUNCEMENT
@@ -18,13 +16,13 @@ const debugObject =
         // color of object in speaking
         //mesh color needs to be renamed debugObject.color to recall said color
         color: '#' + '469ef8',
-        meshCount: 750,
+        meshCount: 50,
         wireframe: true,
         amplitude: 0,
         repulsionDistance: 0.5,
-        repulsionForce: 2
+        repulsionForce: 2,
     }
-
+    
 //hiding the gui with event listener, allowing for the debug menu
 // to be made visible/invisible when typing 'h' (sick guy)
 gui
@@ -37,6 +35,8 @@ window.addEventListener ('keydown', (event) =>
         gui.show(gui._hidden)
 })
 
+//MODEL1
+let model = null
 
 /**
  * Base
@@ -48,6 +48,7 @@ const canvas = document.querySelector('canvas.webgl')
 
 // Scene
 const scene = new THREE.Scene()
+
 
 // Object
 
@@ -86,6 +87,19 @@ const material = new THREE.MeshBasicMaterial({
 const mesh = new THREE.Mesh(geometry, material)
 scene.add(mesh)
 
+//LIGHTING FOR MODELS
+const hardLight = new THREE.DirectionalLight(0xffffff, 1)
+hardLight.position.set(1, 2, 1)
+scene.add(hardLight)
+
+
+
+//GEOMETRY REGENERATE
+//Im doing this because its imperative
+//everytime you make a change to geometry with debug too
+//it helps to delete the older geometry you are working to manipulate
+//something like this helps
+
 function regenerateGeometry () 
 {
 const newPositions = new Float32Array (debugObject.meshCount * 3 * 3)
@@ -95,8 +109,26 @@ for (let i = 0; i < newPositions.length; i++) {
 const newAttribute = new THREE.BufferAttribute(newPositions, 3)
 geometry.setAttribute ('position', newAttribute)
 
+geometry.computeBoundingBox()
+geometry.computeBoundingSphere()
+
+// Update OrbitControls target to center of new geometry
+if (geometry.boundingSphere) {
+    controls.target.copy(geometry.boundingSphere.center)
 
 }
+}
+
+const tumpz = gui.addFolder ('Model')
+        // model 
+    debugObject.tumpzAnimationSpeed = 0.01
+    tumpz.add(debugObject, 'tumpzAnimationSpeed')
+    .min(0.001)
+    .max(0.1)
+    .step(0.001)
+    .name('Anim Speed')
+
+    
 
 gui
 .addColor (debugObject, 'color')
@@ -143,6 +175,9 @@ gui
 .max (20)
 .step (0.001)
 
+gui
+.add (mesh, 'visible')
+
 
 
 // Sizes
@@ -163,13 +198,39 @@ window.addEventListener('resize', () =>
 
     // Update renderer
     renderer.setSize(sizes.width, sizes.height)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
 })
 
 // Camera
 const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100)
 camera.position.z = 3
 scene.add(camera)
+
+const loader = new GLTFLoader()
+let mixer = null
+
+
+// LOADING OF TUMPZ, AND MORE MODELS TO COME
+loader.load(`${import.meta.env.BASE_URL}models/Runaway.glb`, (gltf) =>
+{
+
+    model = gltf.scene
+    model.scale.set (.3, .3, .3) //tweakable model scale x, y, z
+    model.position.set(0, -1, 0)
+    scene.add(model)
+    
+    //GUI SETTING TO MAKE TUMPZ VISIBLE
+    tumpz.add (model, 'visible')
+
+    //Animation loader setup
+    mixer = new THREE.AnimationMixer(model)
+
+    const clip = gltf.animations[1]
+    const action = mixer.clipAction(clip)
+    action.setLoop(THREE.LoopRepeat)
+    action.clampWhenFinished = false
+    action.reset() .play()
+})
 
 // Mouse Interaction
 const raycaster = new THREE.Raycaster()
@@ -181,7 +242,6 @@ window.addEventListener('mousemove', (event) => {
     mouse.y = (event.clientY / sizes.height) * 2 + 1
 })
 
-
 // Controls
 const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
@@ -191,7 +251,7 @@ const renderer = new THREE.WebGLRenderer({
     canvas: canvas
 })
 renderer.setSize(sizes.width, sizes.height)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1))
 
 // Animate
 
@@ -238,6 +298,13 @@ const tick = () =>
 //  Animated possitions
 const elapsedTime = clock.getElapsedTime()
 
+//boobadnoid continous animation play
+const deltaTime = 0.01 // fixed time step = 100 FPS
+
+if (mixer) {
+    mixer.update(debugObject.tumpzAnimationSpeed)
+}
+
 animationMouseReact(geometry.attributes.position, elapsedTime, mouse3D)
    
     // Update controls
@@ -250,6 +317,8 @@ animationMouseReact(geometry.attributes.position, elapsedTime, mouse3D)
     window.requestAnimationFrame(tick)
 }
 
+
 tick()
 
 console.log('Triangle Count:', geometry.attributes.position.count / 3)
+
